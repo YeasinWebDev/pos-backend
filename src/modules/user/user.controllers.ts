@@ -1,6 +1,6 @@
 import { Request, Response } from "express";
 import User from "./user.model";
-import jwt from "jsonwebtoken";
+import jwt, { JwtPayload } from "jsonwebtoken";
 import bcrypt from "bcrypt";
 import { IUser } from "./user.interface";
 
@@ -13,7 +13,7 @@ export const CreateUser = async (req: Request, res: Response) => {
     req.body.password = await bcrypt.hash(req.body.password, 10);
 
     const newUser = await User.create(req.body);
-    
+
     const token = createToken(newUser);
     res.cookie("token", token, {
       httpOnly: true,
@@ -69,6 +69,42 @@ export const loginUser = async (req: Request, res: Response) => {
     res.status(500).send({
       success: false,
       message: "Failed to login user",
+      error: error,
+    });
+  }
+};
+
+export const user = async (req: Request, res: Response) => {
+  const token = req?.cookies?.token;
+
+  if (!token) {
+    return res.status(401).send({
+      success: false,
+      message: "Unauthorized",
+    });
+  }
+
+  try {
+    const decoded = jwt.verify(token, process.env.JWT_SECRET!);
+
+    const user = await User.findById((decoded as JwtPayload).user._id);
+
+    if (!user) {
+      return res.status(404).send({
+        success: false,
+        message: "User not found",
+      });
+    }
+
+    res.status(200).send({
+      success: true,
+      message: "User fetched successfully",
+      data: user,
+    });
+  } catch (error) {
+    res.status(500).send({
+      success: false,
+      message: "Failed to fetch user",
       error: error,
     });
   }
